@@ -1,7 +1,12 @@
+import asyncio
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 import chromadb
 from sentence_transformers import SentenceTransformer
@@ -19,12 +24,43 @@ LOG_DIR.mkdir(exist_ok=True)
 
 audit_logger = logging.getLogger("ai_audit")
 audit_logger.setLevel(logging.INFO)
+audit_logger.propagate = False
 
 file_handler = logging.FileHandler(LOG_DIR / "ai_search_audit.log", encoding="utf-8")
 formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
 file_handler.setFormatter(formatter)
 if not audit_logger.handlers:
     audit_logger.addHandler(file_handler)
+
+def _log_query_error(exc: Exception) -> None:
+    """Log query failures without letting Windows logging issues mask the handler."""
+    try:
+        audit_logger.error(
+            "QUERY ERROR | Type: %s | Message: %s",
+            type(exc).__name__,
+            str(exc),
+            exc_info=True,
+        )
+    except OSError:
+        audit_logger.error(
+            "QUERY ERROR | Type: %s | Message: %s",
+            type(exc).__name__,
+            str(exc),
+        )
+
+
+def _internal_error_response(exc: Exception) -> dict[str, Any]:
+    return {
+        "message": "Query failed",
+        "result": {
+            "technical_analysis": (
+                f"An error occurred while processing the query: {exc}"
+            ),
+            "error_code": "INTERNAL_ERROR",
+            "confidence": 0.0,
+        },
+    }
+
 
 COUNTRY_ALIASES: dict[str, str] = {
     "brasil": "Brazil",
@@ -45,6 +81,7 @@ class FiscalRagService:
         self.db = chromadb.Client()
         self.collection = self.db.get_or_create_collection(name="countries")
         self.memory_service = MemoryService()
+        self._data_ready = False
 
     def normalize_country(self, country: str) -> str:
         cleaned = country.strip()
@@ -53,9 +90,11 @@ class FiscalRagService:
         return COUNTRY_ALIASES.get(cleaned.lower(), cleaned)
 
     async def ingest_data(self) -> None:
+        self._data_ready = False
         raw_data = await self.client.fetch_rates()
 
         if not raw_data or not raw_data.data:
+            logger.warning("Treasury ingest returned no data; semantic search will be empty.")
             return
 
         for item in raw_data.data:
@@ -63,14 +102,21 @@ class FiscalRagService:
                 f"In {item.country}, the official currency is {item.currency}. "
                 f"The recorded exchange rate is {item.exchange_rate}."
             )
-            embedding = self.model.encode([document]).tolist()[0]
+            embedding = await asyncio.to_thread(
+                self.model.encode,
+                [document],
+            )
+            embedding_list = embedding.tolist()[0]
 
-            self.collection.add(
+            self.collection.upsert(
                 documents=[document],
-                embeddings=[embedding],
+                embeddings=[embedding_list],
                 metadatas=[{"country": item.country}],
                 ids=[f"rate_{item.country}_{item.record_date}"],
             )
+
+        self._data_ready = True
+        logger.info("Treasury ingest complete (%s records).", len(raw_data.data))
 
     async def search_in_chromadb(
         self,
@@ -82,7 +128,8 @@ class FiscalRagService:
         search_text = (
             f"{normalized_country}. {query}" if normalized_country else query
         )
-        query_embedding = self.model.encode([search_text]).tolist()
+        encoded = await asyncio.to_thread(self.model.encode, [search_text])
+        query_embedding = encoded.tolist()
 
         query_kwargs: dict[str, Any] = {
             "query_embeddings": query_embedding,
@@ -145,13 +192,33 @@ class FiscalRagService:
         session_id: str = "default",
     ) -> FiscalResponse | dict[str, Any]:
         try:
+            if not getattr(self, "_data_ready", False):
+                return {
+                    "message": "Data not ready",
+                    "result": {
+                        "technical_analysis": (
+                            "Treasury data is still loading or failed to ingest. "
+                            "Wait for startup to finish and try again."
+                        ),
+                        "error_code": "DATA_NOT_READY",
+                        "confidence": 0.0,
+                    },
+                }
+
             history = self.memory_service.get_history(session_id)
 
             if not settings.gemini_api_key:
-                raise ValueError(
-                    "GEMINI_API_KEY is not set. "
-                    "Copy .env.example to .env and add your key."
-                )
+                return {
+                    "message": "Configuration error",
+                    "result": {
+                        "technical_analysis": (
+                            "GEMINI_API_KEY is not set. "
+                            "Copy .env.example to .env and add your key."
+                        ),
+                        "error_code": "MISSING_API_KEY",
+                        "confidence": 0.0,
+                    },
+                }
 
             gemini = GeminiService(settings.gemini_api_key)
 
@@ -241,12 +308,8 @@ class FiscalRagService:
             )
 
         except Exception as exc:
-            audit_logger.error(
-                "QUERY ERROR | Type: %s | Message: %s",
-                type(exc).__name__,
-                str(exc),
-            )
-            raise
+            _log_query_error(exc)
+            return _internal_error_response(exc)
 
         return final_result
 

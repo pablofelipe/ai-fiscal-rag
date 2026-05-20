@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -11,7 +12,6 @@ from tenacity import (
 
 from app.fiscal_response import FiscalResponse
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +19,22 @@ class GeminiService:
     def __init__(self, api_key: str) -> None:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel("gemini-2.5-flash")
+
+    @staticmethod
+    def _response_text(response: object) -> str:
+        try:
+            text = getattr(response, "text", None)
+            return (text or "").strip()
+        except Exception as exc:
+            raise ValueError(f"Gemini returned no usable text: {exc}") from exc
+
+    async def _generate_content(self, prompt: str, **kwargs: object) -> object:
+        """Run the sync Gemini SDK off the asyncio event loop (Windows-safe)."""
+        return await asyncio.to_thread(
+            self.model.generate_content,
+            prompt,
+            **kwargs,
+        )
 
     async def identify_country_context(self, question: str, history: str) -> str:
         prompt = f"""
@@ -30,8 +46,8 @@ class GeminiService:
         HISTORY: {history}
         QUESTION: {question}
         """
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
+        response = await self._generate_content(prompt)
+        return self._response_text(response)
 
     async def validate_intent(self, question: str) -> bool:
         prompt = f"""
@@ -44,8 +60,8 @@ class GeminiService:
 
         Reply with only "YES" if related or "NO" if it is off-topic.
         """
-        response = self.model.generate_content(prompt)
-        return "YES" in response.text.upper()
+        response = await self._generate_content(prompt)
+        return "YES" in self._response_text(response).upper()
 
     async def rerank_results(
         self, question: str, formatted_candidates: str, country: str
@@ -67,11 +83,11 @@ class GeminiService:
 
         Return ONLY a JSON array of integers. Example: [1]
         """
-        response = self.model.generate_content(
+        response = await self._generate_content(
             prompt,
             generation_config={"response_mime_type": "application/json"},
         )
-        return json.loads(response.text)
+        return json.loads(self._response_text(response))
 
     @retry(
         stop=stop_after_attempt(3),
@@ -105,14 +121,14 @@ class GeminiService:
         Respond strictly following the defined JSON schema.
         """
         try:
-            response = self.model.generate_content(
+            response = await self._generate_content(
                 prompt,
                 generation_config={
                     "response_mime_type": "application/json",
                     "response_schema": FiscalResponse,
                 },
             )
-            return FiscalResponse.model_validate_json(response.text)
+            return FiscalResponse.model_validate_json(self._response_text(response))
         except Exception as exc:
             logger.error("Gemini API call failed: %s", exc)
             raise

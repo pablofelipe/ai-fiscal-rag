@@ -12,6 +12,7 @@ def service() -> FiscalRagService:
     svc.memory_service = MagicMock()
     svc.memory_service.get_history.return_value = "No previous conversation."
     svc.memory_service.add_message = MagicMock()
+    svc._data_ready = True
     return svc
 
 
@@ -81,6 +82,16 @@ async def test_prepare_context_returns_placeholder_when_empty(
 def test_normalize_country_maps_portuguese_aliases(service: FiscalRagService):
     assert service.normalize_country("Brasil") == "Brazil"
     assert service.normalize_country("Brazil") == "Brazil"
+
+
+@pytest.mark.asyncio
+async def test_handle_fiscal_search_reports_missing_api_key(service: FiscalRagService):
+    with patch("app.fiscal_rag_service.settings") as mock_settings:
+        mock_settings.gemini_api_key = ""
+        result = await service.handle_fiscal_search("What is the currency?", "Brazil")
+
+    assert result["message"] == "Configuration error"
+    assert result["result"]["error_code"] == "MISSING_API_KEY"
 
 
 def test_filter_results_by_country_keeps_only_target(service: FiscalRagService):
