@@ -1,0 +1,4 @@
+[virtualenvs]
+# Use pyenv's active Python (.python-version). Set in-project = true after removing a stale .venv.
+in-project = false
+prefer-active-python = true

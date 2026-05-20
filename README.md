@@ -21,13 +21,28 @@ On first run, `sentence-transformers` downloads the `all-MiniLM-L6-v2` model (~8
 
 ## Setup
 
+Requires **Python 3.13** (recommended: [pyenv-win](https://github.com/pyenv-win/pyenv-win)). The repo ships a `.python-version` file.
+
 ```bash
 git clone https://github.com/pablofelipe/ai-fiscal-rag.git
 cd ai-fiscal-rag
+pyenv install 3.13.0   # skip if already installed
+poetry env use "$(pyenv which python)"
 poetry install
 cp .env.example .env
 # Edit .env and set GEMINI_API_KEY
 ```
+
+On Windows PowerShell you can run `.\scripts\setup.ps1` to bind Poetry to pyenv and reinstall dependencies.
+
+### Poetry / venv troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `virtual environment ... seems to be broken` | A stale `.venv` from another machine or project. Close the editor, delete the `.venv` folder, then run `.\scripts\setup.ps1` or `poetry env use "$(pyenv which python)"` + `poetry install`. |
+| `[WinError 5] Acesso negado` on `ruff.exe` | The Ruff extension holds `.venv\Scripts\ruff.exe`. Close Cursor/VS Code, delete `.venv`, rerun setup. |
+| Poetry picks Python 3.14 instead of 3.13 | Run `poetry env use` with the pyenv 3.13 interpreter (see setup above). |
+| `poetry install` fails installing the root package | This app is non-package mode; ensure `pyproject.toml` contains `[tool.poetry]` with `package-mode = false`. |
 
 ## Run
 
