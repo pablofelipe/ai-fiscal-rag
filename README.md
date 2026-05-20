@@ -22,7 +22,7 @@ On first run, `sentence-transformers` downloads the `all-MiniLM-L6-v2` model (~8
 ## Setup
 
 ```bash
-git clone https://github.com/<your-user>/ai-fiscal-rag.git
+git clone https://github.com/pablofelipe/ai-fiscal-rag.git
 cd ai-fiscal-rag
 poetry install
 cp .env.example .env
