@@ -67,7 +67,7 @@
     },
     {
       "parameters": {
-        "url": "https://47fb-200-207-170-57.ngrok-free.app/fiscal_search",
+        "url": "https://YOUR-NGROK-URL.ngrok-free.app/fiscal_search",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
