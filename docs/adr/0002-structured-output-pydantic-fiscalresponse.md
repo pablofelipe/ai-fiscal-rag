@@ -45,10 +45,11 @@ surfacing them as request failures.
 - `error_code` was already modeled as a free-form string with no fixed enum
   of values (`error_code: str = Field(description="Fiscal error code if
   identified; use empty string if none")`), not something Treasury-specific.
-  It is currently always empty on the success path in production use —
-  Fase 1's domain migration to NF-e/SEFAZ rejection codes can populate it
-  with the identified rejection code (e.g. `"204"`, `"539"`) without a
-  schema-breaking change.
+  It is currently always empty on the success path in production use. A
+  migration to a domain that would have populated it (NF-e/SEFAZ rejection
+  codes) was evaluated and rejected (ADR-0007); the field's generic shape
+  means it stays ready for a different domain if one is chosen later,
+  without a schema-breaking change.
 - Validation and prompting are coupled: every prompt in `GeminiService`
   explicitly instructs Gemini to "respond strictly following the defined
   JSON schema" or to format specific fields (e.g. the `sources_used`

@@ -63,9 +63,9 @@ response rather than letting the question flow into retrieval/generation.
   do) it avoids for rejected questions.
 - `validate_intent`'s prompt (`app/gemini_service.py:52-64`) is hardcoded to
   "exchange rates ... fiscal, tax, or economic matters ... U.S. Treasury
-  data." A planned domain migration to NF-e/SEFAZ rejection codes requires
-  rewriting this prompt; the guardrail mechanism itself does not need to
-  change.
+  data." A migration to a different fiscal domain was evaluated and
+  rejected (ADR-0007); the pipeline stays on the Treasury domain for now,
+  so this prompt is not scheduled to change.
 - A rejected question and a low-confidence in-scope answer are both surfaced
   through the same `confidence` field to any caller that doesn't also check
   `error_code`. The n8n workflow's `If` node (see ADR-0003) currently only
