@@ -9,3 +9,4 @@ logs/
 ai_search_audit.log
 *.log
 .vscode/
+CLAUDE.md
