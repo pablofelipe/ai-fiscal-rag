@@ -96,6 +96,20 @@ flowchart LR
     F --> G[Session memory]
 ```
 
+## Roadmap
+
+- **MCP server (planned, not implemented)** — expose the RAG pipeline
+  (`FiscalRagService.handle_fiscal_search`, `app/fiscal_rag_service.py`) as
+  an MCP tool consumable by a local MCP client, over the **stdio**
+  transport. Scope: one tool wrapping the existing `question`/`country`/
+  `session_id` inputs and returning the existing `FiscalResponse`; no new
+  retrieval or LLM logic. This is consistent with
+  [ADR-0006](docs/adr/0006-direct-coupling-to-gemini-sdk.md), which
+  documents this project as running locally, for the maintainer only, with
+  no public-deployment goal — an MCP server over stdio is a local
+  integration point and does **not** expand that Non-Goal. Revisit the
+  "no public deployment" premise (and this scope) if that ever changes.
+
 ## Development
 
 ```bash
