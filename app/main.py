@@ -20,7 +20,9 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(
+    _request: Request, exc: Exception
+) -> JSONResponse:
     return JSONResponse(
         status_code=500,
         content={

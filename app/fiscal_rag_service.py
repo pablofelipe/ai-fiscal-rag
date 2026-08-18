@@ -94,7 +94,9 @@ class FiscalRagService:
         raw_data = await self.client.fetch_rates()
 
         if not raw_data or not raw_data.data:
-            logger.warning("Treasury ingest returned no data; semantic search will be empty.")
+            logger.warning(
+                "Treasury ingest returned no data; semantic search will be empty."
+            )
             return
 
         for item in raw_data.data:

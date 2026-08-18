@@ -1,6 +1,12 @@
 # ai-fiscal-rag
 
+[![ci](https://github.com/pablofelipe/ai-fiscal-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/pablofelipe/ai-fiscal-rag/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Experimental RAG API for fiscal and exchange-rate questions, backed by U.S. Treasury data and Google Gemini.
+
+See [STATUS.md](STATUS.md) for what works today, known limitations, and
+what's deliberately not built yet.
 
 ## Features
 
